@@ -1,50 +1,131 @@
 #type: ignore
 import streamlit as st
+from database.connection import SessionLocal
+from database.models import Usuario
+from utils.auth import verificar_senha, gerar_hash
 
-# 1. Configuração inicial da página (deve ser o primeiro comando do Streamlit)
-# Define o título da aba do navegador, o ícone e usa o layout "wide" para ocupar mais espaço na tela.
-st.set_page_config(
-    page_title="Sistema Interno de Planilhas",
-    page_icon="📊",
-    layout="wide"
-)
+st.set_page_config(page_title="Sistema Interno de Planilhas", page_icon="📊", layout="wide")
 
-# 2. Barra lateral (Sidebar)
-# O Streamlit facilita a criação de menus laterais. Usaremos isso no futuro para navegação.
-st.sidebar.title("Menu de Navegação")
-st.sidebar.info("As opções de menu e setores aparecerão aqui após o login.")
+# --- INICIALIZAÇÃO DE SESSÃO ---
+if 'logado' not in st.session_state:
+    st.session_state['logado'] = False
+    st.session_state['usuario_nome'] = ""
+    st.session_state['nivel_acesso'] = ""
+    st.session_state['setor'] = ""
 
-# 3. Cabeçalho e Título Principal
-st.title("📊 Sistema Interno de Gestão de Planilhas")
-st.markdown("---") # Cria uma linha horizontal de separação
+def realizar_login(username, password):
+    db = SessionLocal()
+    usuario = db.query(Usuario).filter(Usuario.username == username).first()
+    db.close()
+    
+    if usuario and verificar_senha(password, usuario.senha_hash):
+        st.session_state['logado'] = True
+        st.session_state['usuario_nome'] = usuario.nome
+        st.session_state['nivel_acesso'] = usuario.nivel_acesso
+        st.session_state['setor'] = usuario.setor
+        st.rerun()
+    else:
+        st.error("Utilizador ou palavra-passe incorretos.")
 
-# 4. Ambiente de QA (Testes)
-st.header("Página Inicial (Ambiente de QA)")
-st.write(
-    "Bem-vindo! Este é o ambiente de testes da interface do sistema. "
-    "O objetivo é facilitar a manipulação e o preenchimento de planilhas de forma restrita e padronizada."
-)
+def fazer_logout():
+    for key in ['logado', 'usuario_nome', 'nivel_acesso', 'setor']:
+        st.session_state[key] = ""
+    st.session_state['logado'] = False
+    st.rerun()
 
-# 5. Simulação de Regras de Negócio e Setores
-st.subheader("Visão de Setores (Simulação visual)")
-st.info(
-    "Nenhuma regra de banco de dados ou permissão está ativa no momento. "
-    "No futuro, a renderização abaixo será dinâmica com base no nível de acesso do usuário logado."
-)
+# --- INTERFACE ---
+if not st.session_state['logado']:
+    st.title("🔒 Acesso ao Sistema")
+    with st.form("form_login"):
+        username = st.text_input("Nome de Utilizador")
+        password = st.text_input("Palavra-passe", type="password")
+        submit = st.form_submit_button("Entrar")
+        if submit:
+            if username and password:
+                realizar_login(username, password)
+            else:
+                st.warning("Preencha ambos os campos.")
 
-# 6. Layout em Colunas
-# Aqui usamos st.columns para dividir a tela. O bloco 'with' garante que o que está dentro 
-# seja renderizado apenas na respectiva coluna.
-col1, col2, col3 = st.columns(3)
+else:
+    # --- MENU LATERAL (ROTEAMENTO) ---
+    st.sidebar.title(f"Olá, {st.session_state['usuario_nome']}")
+    st.sidebar.info(f"Nível: {st.session_state['nivel_acesso']} | Setor: {st.session_state['setor']}")
+    
+    # Define o que o utilizador pode ver no menu
+    opcoes_menu = ["🏠 Início (Setores)"]
+    if st.session_state['nivel_acesso'] in ['Admin', 'Supervisor']:
+        opcoes_menu.append("⚙️ Gestão de Usuários")
+        
+    menu_escolhido = st.sidebar.radio("Navegação", opcoes_menu)
+    
+    if st.sidebar.button("Sair"):
+        fazer_logout()
 
-with col1:
-    # Simulando o setor 'Desma' mencionado no README
-    st.button("📂 Acessar Setor Desma", use_container_width=True)
+    # --- PÁGINA: INÍCIO (SETORES) ---
+    if menu_escolhido == "🏠 Início (Setores)":
+        st.title("📊 Painel de Planilhas")
+        st.write("Selecione o setor para inserir dados. Só tem acesso aos setores autorizados para o seu perfil.")
+        st.markdown("---")
+        
+        col1, col2 = st.columns(2)
+        
+        # Regra de negócio: Admin acede a tudo. Utilizador normal só acede ao seu próprio setor.
+        pode_acessar_desma = st.session_state['nivel_acesso'] == 'Admin' or st.session_state['setor'] == 'Desma'
+        
+        with col1:
+            st.subheader("Setor Desma")
+            if pode_acessar_desma:
+                st.success("✅ Acesso Permitido")
+                st.button("📂 Abrir Planilhas Desma", use_container_width=True)
+            else:
+                st.error("❌ Acesso Bloqueado")
+                st.button("🔒 Abrir Planilhas Desma", disabled=True, use_container_width=True)
+                
+        with col2:
+            st.subheader("Setor Financeiro (Exemplo)")
+            st.warning("🚧 Em desenvolvimento")
+            st.button("🔒 Acesso Restrito", disabled=True, use_container_width=True)
 
-with col2:
-    # Simulando um setor sem permissão (botão desabilitado)
-    st.button("🔒 Setor B (Acesso Restrito)", disabled=True, use_container_width=True)
-
-with col3:
-    # Simulando a área de supervisão/admin
-    st.button("⚙️ Painel do Supervisor", disabled=True, use_container_width=True)
+    # --- PÁGINA: GESTÃO DE USUÁRIOS (APENAS ADMIN/SUPERVISOR) ---
+    elif menu_escolhido == "⚙️ Gestão de Usuários":
+        st.title("⚙️ Gestão de Usuários")
+        st.write("Adicione novos funcionários e defina as suas permissões.")
+        
+        with st.form("form_novo_usuario"):
+            novo_nome = st.text_input("Nome Completo")
+            novo_username = st.text_input("Nome de Utilizador (Login)")
+            nova_senha = st.text_input("Palavra-passe provisória", type="password")
+            
+            # Supervisores não podem criar outros Administradores, apenas Padrão ou Supervisores.
+            niveis_disponiveis = ["Padrao"]
+            if st.session_state['nivel_acesso'] == 'Admin':
+                niveis_disponiveis.extend(["Supervisor", "Admin"])
+                
+            novo_nivel = st.selectbox("Nível de Acesso", niveis_disponiveis)
+            novo_setor = st.selectbox("Setor", ["Desma", "Financeiro", "RH", "Todos"])
+            
+            submit_novo = st.form_submit_button("Cadastrar Utilizador")
+            
+            if submit_novo:
+                if novo_nome and novo_username and nova_senha:
+                    db = SessionLocal()
+                    # Verifica se o username já existe
+                    existe = db.query(Usuario).filter(Usuario.username == novo_username).first()
+                    
+                    if existe:
+                        st.error("Este Nome de Utilizador já está em uso!")
+                    else:
+                        senha_hash = gerar_hash(nova_senha)
+                        novo_usuario = Usuario(
+                            nome=novo_nome,
+                            username=novo_username,
+                            senha_hash=senha_hash,
+                            nivel_acesso=novo_nivel,
+                            setor=novo_setor
+                        )
+                        db.add(novo_usuario)
+                        db.commit()
+                        st.success(f"Utilizador '{novo_username}' criado com sucesso!")
+                    db.close()
+                else:
+                    st.warning("Por favor, preencha todos os campos do formulário.")
