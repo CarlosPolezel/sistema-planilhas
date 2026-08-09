@@ -1,20 +1,19 @@
-from database.connection import criar_bd, SessionLocal
-from database.models import Usuario
+from database.connection import criar_bd, SessionLocal, engine
+from database.models import Base, Usuario
+from database.repositories import UsuarioRepository
 #type: ignore
 import bcrypt
 
-print("A criar a base de dados e as tabelas...")
-criar_bd()
+print("Recriando as tabelas no banco de dados...")
+Base.metadata.create_all(bind=engine)
 
-# Inicia a ligação
 db = SessionLocal()
+user_repo = UsuarioRepository(db)
 
-# Verifica se o admin já existe para não criar duplicados
-admin_existente = db.query(Usuario).filter(Usuario.username == "admin").first()
+admin_existente = user_repo.buscar_por_username("admin")
 
 if not admin_existente:
-    print("A gerar o primeiro utilizador Admin...")
-    # Usa o bcrypt para criar o hash da palavra-passe 'admin123'
+    print("Gerando o usuário Administrador padrão...")
     senha_plana = "admin123".encode('utf-8')
     salt = bcrypt.gensalt()
     senha_hash = bcrypt.hashpw(senha_plana, salt).decode('utf-8')
@@ -24,12 +23,12 @@ if not admin_existente:
         username="admin",
         senha_hash=senha_hash,
         nivel_acesso="Admin",
-        setor="Todos"
+        setor="Todos",
+        ativo=True
     )
-    db.add(novo_admin)
-    db.commit()
-    print("Sucesso! Utilizador Admin criado (Username: admin | Password: admin123)")
+    user_repo.criar(novo_admin)
+    print("Administrador criado com sucesso! (Username: admin | Password: admin123)")
 else:
-    print("A base de dados já está pronta e o Admin já existe.")
+    print("O banco de dados já está configurado e o usuário admin já existe.")
 
 db.close()

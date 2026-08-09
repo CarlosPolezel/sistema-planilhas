@@ -1,8 +1,10 @@
 #type: ignore
+from utils.auth import verificar_senha, gerar_hash
+from utils.validators import validar_username, validar_senha, sanitizar_texto
+#type: ignore
 import streamlit as st
 from database.connection import SessionLocal
 from database.models import Usuario
-from utils.auth import verificar_senha, gerar_hash
 
 st.set_page_config(page_title="Sistema Interno de Planilhas", page_icon="📊", layout="wide")
 
@@ -108,24 +110,37 @@ else:
             
             if submit_novo:
                 if novo_nome and novo_username and nova_senha:
-                    db = SessionLocal()
-                    # Verifica se o username já existe
-                    existe = db.query(Usuario).filter(Usuario.username == novo_username).first()
+                    # 1. Sanitiza os textos para evitar XSS
+                    nome_seguro = sanitizar_texto(novo_nome)
                     
-                    if existe:
-                        st.error("Este Nome de Utilizador já está em uso!")
+                    # 2. Valida o Username
+                    user_valido, user_msg = validar_username(novo_username)
+                    # 3. Valida a Senha
+                    senha_valida, senha_msg = validar_senha(nova_senha)
+                    
+                    if not user_valido:
+                        st.error(user_msg)
+                    elif not senha_valida:
+                        st.error(senha_msg)
                     else:
-                        senha_hash = gerar_hash(nova_senha)
-                        novo_usuario = Usuario(
-                            nome=novo_nome,
-                            username=novo_username,
-                            senha_hash=senha_hash,
-                            nivel_acesso=novo_nivel,
-                            setor=novo_setor
-                        )
-                        db.add(novo_usuario)
-                        db.commit()
-                        st.success(f"Utilizador '{novo_username}' criado com sucesso!")
-                    db.close()
+                        # Se passou por todas as validações de segurança, prossegue com o banco
+                        db = SessionLocal()
+                        existe = db.query(Usuario).filter(Usuario.username == novo_username).first()
+                        
+                        if existe:
+                            st.error("Este Nome de Utilizador já está em uso!")
+                        else:
+                            senha_hash = gerar_hash(nova_senha)
+                            novo_usuario = Usuario(
+                                nome=nome_seguro,
+                                username=novo_username,
+                                senha_hash=senha_hash,
+                                nivel_acesso=novo_nivel,
+                                setor=novo_setor
+                            )
+                            db.add(novo_usuario)
+                            db.commit()
+                            st.success(f"Utilizador '{novo_username}' criado com sucesso, obedecendo às políticas de segurança!")
+                        db.close()
                 else:
                     st.warning("Por favor, preencha todos os campos do formulário.")
