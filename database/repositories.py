@@ -1,7 +1,6 @@
 #type: ignore
 from sqlalchemy.orm import Session
-from database.models import Usuario, Auditoria
-from database.models import Usuario, Auditoria, RegistroDesmoldante
+from database.models import Usuario, Auditoria, RegistroDesmoldante, RegistroSolaArrancada, RegistroDescarte
 
 class UsuarioRepository:
     def __init__(self, db: Session):
@@ -54,3 +53,29 @@ class RegistroDesmoldanteRepository:
     def listar_todos(self):
         # Retorna os registos ordenados do mais recente para o mais antigo
         return self.db.query(RegistroDesmoldante).order_by(RegistroDesmoldante.id.desc()).all()
+
+class RegistroSolaArrancadaRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def criar(self, registro: RegistroSolaArrancada) -> RegistroSolaArrancada:
+        self.db.add(registro)
+        self.db.commit()
+        self.db.refresh(registro)
+        return registro
+
+    def listar_todos(self):
+        return self.db.query(RegistroSolaArrancada).order_by(RegistroSolaArrancada.id.desc()).all()
+
+class RegistroDescarteRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def criar(self, registro: RegistroDescarte) -> RegistroDescarte:
+        self.db.add(registro)
+        self.db.commit()
+        self.db.refresh(registro)
+        return registro
+
+    def listar_todos(self):
+        return self.db.query(RegistroDescarte).order_by(RegistroDescarte.id.desc()).all()
