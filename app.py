@@ -9,6 +9,7 @@ from services.sola_arrancada_service import SolaArrancadaService
 from services.descarte_service import DescarteService
 from utils.auth import gerar_hash
 from utils.validators import validar_username, validar_senha, sanitizar_texto
+from utils.excel_handler import exportar_excel, exportar_csv
 
 st.set_page_config(page_title="Sistema Interno de Planilhas", page_icon="📊", layout="wide")
 
@@ -54,6 +55,14 @@ def fazer_logout():
     for key in ['usuario_id', 'nome', 'perfil', 'setor']:
         st.session_state[key] = ""
     st.rerun()
+
+def auditar_download(modulo):
+    db = SessionLocal()
+    try:
+        auth_service = AuthService(db)
+        auth_service.registrar_exportacao(st.session_state['usuario_id'], st.session_state['nome'], modulo)
+    finally:
+        db.close()
 
 # --- INTERFACE ---
 if not st.session_state['autenticado']:
@@ -138,9 +147,33 @@ else:
             try:
                 dados_historico = DesmoldanteService(db).obter_historico()
                 if dados_historico:
-                    st.dataframe(pd.DataFrame(dados_historico), use_container_width=True, hide_index=True)
+                    df_historico = pd.DataFrame(dados_historico)
+                    st.dataframe(df_historico, use_container_width=True, hide_index=True)
+                    
+                    st.markdown("### Exportar Dados")
+                    col_btn1, col_btn2, _ = st.columns([1, 1, 3])
+                    
+                    with col_btn1:
+                        st.download_button(
+                            label="📥 Descarregar Excel (.xlsx)",
+                            data=exportar_excel(df_historico),
+                            file_name=f"desmoldante_{datetime.date.today()}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            on_click=auditar_download,
+                            args=("registros_desmoldante",)
+                        )
+                    
+                    with col_btn2:
+                        st.download_button(
+                            label="📥 Descarregar CSV",
+                            data=exportar_csv(df_historico),
+                            file_name=f"desmoldante_{datetime.date.today()}.csv",
+                            mime="text/csv",
+                            on_click=auditar_download,
+                            args=("registros_desmoldante",)
+                        )
                 else:
-                    st.info("Sem registos.")
+                    st.info("Sem registos para exportar.")
             finally:
                 db.close()
 

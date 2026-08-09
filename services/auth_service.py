@@ -64,3 +64,12 @@ class AuthService:
                 entidade="usuarios",
                 detalhes="Sessão encerrada pelo utilizador."
             )
+
+def registrar_exportacao(self, usuario_id: int, usuario_nome: str, modulo: str):
+        self.audit_repo.registrar(
+            usuario_id=usuario_id,
+            usuario_nome=usuario_nome,
+            acao="EXPORTACAO_REALIZADA",
+            entidade=modulo,
+            detalhes=f"O utilizador exportou os dados do módulo {modulo}."
+        )
