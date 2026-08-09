@@ -1,4 +1,3 @@
-#type: ignore
 import bcrypt
 
 def verificar_senha(senha_plana, senha_hash):
