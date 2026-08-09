@@ -1,43 +1,66 @@
 #type: ignore
-from utils.auth import verificar_senha, gerar_hash
-from utils.validators import validar_username, validar_senha, sanitizar_texto
-#type: ignore
 import streamlit as st
 from database.connection import SessionLocal
-from database.models import Usuario
+from database.repositories import UsuarioRepository
+from services.auth_service import AuthService
+from utils.auth import gerar_hash
+from utils.validators import validar_username, validar_senha, sanitizar_texto
 
 st.set_page_config(page_title="Sistema Interno de Planilhas", page_icon="📊", layout="wide")
 
-# --- INICIALIZAÇÃO DE SESSÃO ---
-if 'logado' not in st.session_state:
-    st.session_state['logado'] = False
-    st.session_state['usuario_nome'] = ""
-    st.session_state['nivel_acesso'] = ""
+# --- INICIALIZAÇÃO DE SESSÃO DA ETAPA 9 ---
+if 'autenticado' not in st.session_state:
+    st.session_state['autenticado'] = False
+if 'usuario_id' not in st.session_state:
+    st.session_state['usuario_id'] = None
+if 'nome' not in st.session_state:
+    st.session_state['nome'] = ""
+if 'perfil' not in st.session_state:
+    st.session_state['perfil'] = ""
+if 'setor' not in st.session_state:
     st.session_state['setor'] = ""
 
 def realizar_login(username, password):
     db = SessionLocal()
-    usuario = db.query(Usuario).filter(Usuario.username == username).first()
-    db.close()
-    
-    if usuario and verificar_senha(password, usuario.senha_hash):
-        st.session_state['logado'] = True
-        st.session_state['usuario_nome'] = usuario.nome
-        st.session_state['nivel_acesso'] = usuario.nivel_acesso
-        st.session_state['setor'] = usuario.setor
-        st.rerun()
-    else:
-        st.error("Utilizador ou palavra-passe incorretos.")
+    try:
+        auth_service = AuthService(db)
+        
+        sucesso, mensagem, usuario = auth_service.autenticar(username, password)
+        
+        if sucesso:
+            # Lemos todos os dados ANTES de fechar a base de dados
+            st.session_state['autenticado'] = True
+            st.session_state['usuario_id'] = usuario.id
+            st.session_state['nome'] = usuario.nome
+            st.session_state['perfil'] = usuario.nivel_acesso
+            st.session_state['setor'] = usuario.setor
+            st.rerun()
+        else:
+            st.error(mensagem)
+    finally:
+        # O 'finally' garante que o db.close() acontece sempre no final, 
+        # independentemente de o login ter sucesso ou falhado.
+        db.close()
 
 def fazer_logout():
-    for key in ['logado', 'usuario_nome', 'nivel_acesso', 'setor']:
-        st.session_state[key] = ""
-    st.session_state['logado'] = False
+    if st.session_state['autenticado']:
+        db = SessionLocal()
+        auth_service = AuthService(db)
+        auth_service.registrar_logout(st.session_state['usuario_id'], st.session_state['nome'])
+        db.close()
+
+    st.session_state['autenticado'] = False
+    st.session_state['usuario_id'] = None
+    st.session_state['nome'] = ""
+    st.session_state['perfil'] = ""
+    st.session_state['setor'] = ""
     st.rerun()
 
 # --- INTERFACE ---
-if not st.session_state['logado']:
+if not st.session_state['autenticado']:
     st.title("🔒 Acesso ao Sistema")
+    st.write("Insira as suas credenciais para aceder ao sistema de gestão.")
+    
     with st.form("form_login"):
         username = st.text_input("Nome de Utilizador")
         password = st.text_input("Palavra-passe", type="password")
@@ -46,16 +69,15 @@ if not st.session_state['logado']:
             if username and password:
                 realizar_login(username, password)
             else:
-                st.warning("Preencha ambos os campos.")
+                st.warning("Por favor, preencha todos os campos.")
 
 else:
-    # --- MENU LATERAL (ROTEAMENTO) ---
-    st.sidebar.title(f"Olá, {st.session_state['usuario_nome']}")
-    st.sidebar.info(f"Nível: {st.session_state['nivel_acesso']} | Setor: {st.session_state['setor']}")
+    # --- MENU LATERAL (ROTEAMENTO BASEADO EM PERFIS) ---
+    st.sidebar.title(f"Olá, {st.session_state['nome']}")
+    st.sidebar.info(f"Perfil: {st.session_state['perfil']} | Setor: {st.session_state['setor']}")
     
-    # Define o que o utilizador pode ver no menu
     opcoes_menu = ["🏠 Início (Setores)"]
-    if st.session_state['nivel_acesso'] in ['Admin', 'Supervisor']:
+    if st.session_state['perfil'] in ['Admin', 'Supervisor']:
         opcoes_menu.append("⚙️ Gestão de Usuários")
         
     menu_escolhido = st.sidebar.radio("Navegação", opcoes_menu)
@@ -65,42 +87,39 @@ else:
 
     # --- PÁGINA: INÍCIO (SETORES) ---
     if menu_escolhido == "🏠 Início (Setores)":
-        st.title("📊 Painel de Planilhas")
-        st.write("Selecione o setor para inserir dados. Só tem acesso aos setores autorizados para o seu perfil.")
+        st.title("📊 Painel Operacional")
+        st.write("Aceda aos módulos operacionais do seu setor autorizado.")
         st.markdown("---")
         
         col1, col2 = st.columns(2)
-        
-        # Regra de negócio: Admin acede a tudo. Utilizador normal só acede ao seu próprio setor.
-        pode_acessar_desma = st.session_state['nivel_acesso'] == 'Admin' or st.session_state['setor'] == 'Desma'
+        pode_acessar_desma = st.session_state['perfil'] == 'Admin' or st.session_state['setor'] in ['Desma', 'Todos']
         
         with col1:
             st.subheader("Setor Desma")
             if pode_acessar_desma:
                 st.success("✅ Acesso Permitido")
-                st.button("📂 Abrir Planilhas Desma", use_container_width=True)
+                st.button("📂 Abrir Módulo Desma", use_container_width=True)
             else:
                 st.error("❌ Acesso Bloqueado")
-                st.button("🔒 Abrir Planilhas Desma", disabled=True, use_container_width=True)
+                st.button("🔒 Acesso Restrito", disabled=True, use_container_width=True)
                 
         with col2:
-            st.subheader("Setor Financeiro (Exemplo)")
+            st.subheader("Setor Financeiro")
             st.warning("🚧 Em desenvolvimento")
             st.button("🔒 Acesso Restrito", disabled=True, use_container_width=True)
 
-    # --- PÁGINA: GESTÃO DE USUÁRIOS (APENAS ADMIN/SUPERVISOR) ---
+    # --- PÁGINA: GESTÃO DE USUÁRIOS ---
     elif menu_escolhido == "⚙️ Gestão de Usuários":
-        st.title("⚙️ Gestão de Usuários")
-        st.write("Adicione novos funcionários e defina as suas permissões.")
+        st.title("⚙️ Gestão de Usuários e Auditoria")
+        st.write("Cadastre novos utilizadores e controle permissões.")
         
         with st.form("form_novo_usuario"):
             novo_nome = st.text_input("Nome Completo")
-            novo_username = st.text_input("Nome de Utilizador (Login)")
-            nova_senha = st.text_input("Palavra-passe provisória", type="password")
+            novo_username = st.text_input("Nome de Utilizador")
+            nova_senha = st.text_input("Palavra-passe", type="password")
             
-            # Supervisores não podem criar outros Administradores, apenas Padrão ou Supervisores.
             niveis_disponiveis = ["Padrao"]
-            if st.session_state['nivel_acesso'] == 'Admin':
+            if st.session_state['perfil'] == 'Admin':
                 niveis_disponiveis.extend(["Supervisor", "Admin"])
                 
             novo_nivel = st.selectbox("Nível de Acesso", niveis_disponiveis)
@@ -110,12 +129,8 @@ else:
             
             if submit_novo:
                 if novo_nome and novo_username and nova_senha:
-                    # 1. Sanitiza os textos para evitar XSS
                     nome_seguro = sanitizar_texto(novo_nome)
-                    
-                    # 2. Valida o Username
                     user_valido, user_msg = validar_username(novo_username)
-                    # 3. Valida a Senha
                     senha_valida, senha_msg = validar_senha(nova_senha)
                     
                     if not user_valido:
@@ -123,24 +138,23 @@ else:
                     elif not senha_valida:
                         st.error(senha_msg)
                     else:
-                        # Se passou por todas as validações de segurança, prossegue com o banco
                         db = SessionLocal()
-                        existe = db.query(Usuario).filter(Usuario.username == novo_username).first()
+                        user_repo = UsuarioRepository(db)
                         
-                        if existe:
-                            st.error("Este Nome de Utilizador já está em uso!")
+                        if user_repo.buscar_por_username(novo_username):
+                            st.error("Este Nome de Utilizador já está registado!")
                         else:
-                            senha_hash = gerar_hash(nova_senha)
+                            from database.models import Usuario
                             novo_usuario = Usuario(
                                 nome=nome_seguro,
                                 username=novo_username,
-                                senha_hash=senha_hash,
+                                senha_hash=gerar_hash(nova_senha),
                                 nivel_acesso=novo_nivel,
-                                setor=novo_setor
+                                setor=novo_setor,
+                                ativo=True
                             )
-                            db.add(novo_usuario)
-                            db.commit()
-                            st.success(f"Utilizador '{novo_username}' criado com sucesso, obedecendo às políticas de segurança!")
+                            user_repo.criar(novo_usuario)
+                            st.success(f"Utilizador '{novo_username}' criado com sucesso!")
                         db.close()
                 else:
-                    st.warning("Por favor, preencha todos os campos do formulário.")
+                    st.warning("Preencha todos os campos do formulário.")
