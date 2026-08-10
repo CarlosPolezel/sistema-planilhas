@@ -103,8 +103,57 @@ else:
 
     # --- MÓDULO: GESTÃO DE USUÁRIOS ---
     elif menu_escolhido == "⚙️ Gestão de Usuários":
-        st.title("⚙️ Gestão de Usuários")
-        st.info("Página de Gestão de Usuários configurada anteriormente.")
+        st.title("⚙️ Gestão de Usuários e Auditoria")
+        st.write("Cadastre novos utilizadores e controle permissões.")
+        
+        with st.form("form_novo_usuario"):
+            novo_nome = st.text_input("Nome Completo")
+            novo_username = st.text_input("Nome de Utilizador")
+            nova_senha = st.text_input("Palavra-passe", type="password")
+            
+            niveis_disponiveis = ["Padrao"]
+            if st.session_state['perfil'] == 'Admin':
+                niveis_disponiveis.extend(["Supervisor", "Admin"])
+                
+            novo_nivel = st.selectbox("Nível de Acesso", niveis_disponiveis)
+            novo_setor = st.selectbox("Setor", ["Desma", "Financeiro", "RH", "Todos"])
+            
+            submit_novo = st.form_submit_button("Cadastrar Utilizador")
+            
+            if submit_novo:
+                if novo_nome and novo_username and nova_senha:
+                    nome_seguro = sanitizar_texto(novo_nome)
+                    user_valido, user_msg = validar_username(novo_username)
+                    senha_valida, senha_msg = validar_senha(nova_senha)
+                    
+                    if not user_valido:
+                        st.error(user_msg)
+                    elif not senha_valida:
+                        st.error(senha_msg)
+                    else:
+                        db = SessionLocal()
+                        try:
+                            from database.repositories import UsuarioRepository
+                            from database.models import Usuario
+                            user_repo = UsuarioRepository(db)
+                            
+                            if user_repo.buscar_por_username(novo_username):
+                                st.error("Este Nome de Utilizador já está registado!")
+                            else:
+                                novo_usuario = Usuario(
+                                    nome=nome_seguro,
+                                    username=novo_username,
+                                    senha_hash=gerar_hash(nova_senha),
+                                    nivel_acesso=novo_nivel,
+                                    setor=novo_setor,
+                                    ativo=True
+                                )
+                                user_repo.criar(novo_usuario)
+                                st.success(f"Utilizador '{novo_username}' criado com sucesso!")
+                        finally:
+                            db.close()
+                else:
+                    st.warning("Preencha todos os campos do formulário.")
 
     # --- MÓDULO: DESMOLDANTE (Com Importação/Exportação) ---
     elif menu_escolhido == "🏭 Desmoldante":
