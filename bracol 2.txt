@@ -1,0 +1,7 @@
+Desmoldante
+Maquina | Turno | Periodo | Data | Ano | Calibragem real | Calibragem prevista | Diferença | Agosto | Inicio de Periodo Kg | Fim de periodo kg | Gasto - Kg | Produção pares | Retrabalho pares | Compacta perdida | Descarte
+
+Sola arrancada
+Turno | Méaquina | Data | Mês | Amp | Matriz | Fórmula | Numeração | Fórmula | Quantidade | Código | Motivo | Consumo Pares | Consumo Pé | Consumo Total
+
+
