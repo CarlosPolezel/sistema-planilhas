@@ -1,0 +1,16 @@
+[theme]
+base = "dark"
+
+# Vermelho Bracol - Única cor de ação primária (botões, destaques)
+primaryColor = "#E24B4A" 
+
+# Preto/grafite profundo - Fundo base do modo escuro
+backgroundColor = "#0d1117" 
+
+# Cinza-carvão dos cards - Superfícies elevadas e sidebar
+secondaryBackgroundColor = "#161a22" 
+
+# Branco - Texto de alta prioridade
+textColor = "#ffffff" 
+
+font = "sans serif"
