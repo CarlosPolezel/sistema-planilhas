@@ -65,7 +65,7 @@ class AuthService:
                 detalhes="Sessão encerrada pelo utilizador."
             )
 
-def registrar_exportacao(self, usuario_id: int, usuario_nome: str, modulo: str):
+    def registrar_exportacao(self, usuario_id: int, usuario_nome: str, modulo: str):
         self.audit_repo.registrar(
             usuario_id=usuario_id,
             usuario_nome=usuario_nome,

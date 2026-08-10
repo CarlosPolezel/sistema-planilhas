@@ -1,4 +1,3 @@
-#type: ignore
 import streamlit as st
 import pandas as pd
 import datetime
@@ -9,7 +8,7 @@ from services.sola_arrancada_service import SolaArrancadaService
 from services.descarte_service import DescarteService
 from utils.auth import gerar_hash
 from utils.validators import validar_username, validar_senha, sanitizar_texto
-from utils.excel_handler import exportar_excel, exportar_csv
+from utils.excel_handler import exportar_excel, exportar_csv, ler_arquivo_importacao
 
 st.set_page_config(page_title="Sistema Interno de Planilhas", page_icon="📊", layout="wide")
 
@@ -105,13 +104,12 @@ else:
     # --- MÓDULO: GESTÃO DE USUÁRIOS ---
     elif menu_escolhido == "⚙️ Gestão de Usuários":
         st.title("⚙️ Gestão de Usuários")
-        st.info("Página de Gestão já configurada anteriormente. Utilize para controlar acessos e auditar permissões.")
-        # O formulário pode ser reincorporado aqui futuramente, caso deseje mantê-lo ativo.
+        st.info("Página de Gestão de Usuários configurada anteriormente.")
 
-    # --- MÓDULO: DESMOLDANTE ---
+    # --- MÓDULO: DESMOLDANTE (Com Importação/Exportação) ---
     elif menu_escolhido == "🏭 Desmoldante":
         st.title("🏭 Setor Desma: Desmoldante")
-        tab_registro, tab_historico = st.tabs(["📝 Novo Lançamento", "📋 Histórico"])
+        tab_registro, tab_historico, tab_importacao = st.tabs(["📝 Lançamento", "📋 Histórico", "📤 Importar Planilha"])
         
         with tab_registro:
             with st.form("form_desmoldante", clear_on_submit=True):
@@ -176,6 +174,45 @@ else:
                     st.info("Sem registos para exportar.")
             finally:
                 db.close()
+
+        with tab_importacao:
+            st.subheader("Importar Ficheiro CSV ou Excel")
+            st.info("Carregue o ficheiro. O sistema validará as linhas e mostrará uma pré-visualização antes de gravar no banco de dados.")
+            
+            arquivo_upload = st.file_uploader("Selecione o ficheiro", type=['csv', 'xlsx'])
+            
+            if arquivo_upload is not None:
+                extensao = arquivo_upload.name.split('.')[-1].lower()
+                df = ler_arquivo_importacao(arquivo_upload, extensao)
+                
+                if df is not None and not df.empty:
+                    db = SessionLocal()
+                    try:
+                        servico = DesmoldanteService(db)
+                        resultados_analise = servico.analisar_importacao(df)
+                        df_preview = pd.DataFrame(resultados_analise)
+                        
+                        st.markdown("### Pré-visualização da Validação")
+                        
+                        def formatar_status(val):
+                            color = '#ff9999' if '❌' in str(val) else '#99ff99'
+                            return f'background-color: {color}'
+                        
+                        st.dataframe(df_preview.style.map(formatar_status, subset=['status']), use_container_width=True, hide_index=True)
+                        
+                        qtd_validos = len([r for r in resultados_analise if '✅' in r['status']])
+                        
+                        if qtd_validos > 0:
+                            st.success(f"{qtd_validos} registo(s) válido(s) prontos a importar.")
+                            if st.button("Confirmar Importação de Registos Válidos"):
+                                inseridos = servico.confirmar_importacao(resultados_analise, st.session_state['usuario_id'], st.session_state['nome'])
+                                st.success(f"Importação concluída! {inseridos} registo(s) foram adicionados.")
+                        else:
+                            st.error("Nenhum registo válido encontrado para importar. Verifique os erros assinalados acima.")
+                    finally:
+                        db.close()
+                else:
+                    st.error("Não foi possível ler o ficheiro. Verifique se o formato está correto.")
 
     # --- MÓDULO: SOLA ARRANCADA ---
     elif menu_escolhido == "🏭 Sola Arrancada":
