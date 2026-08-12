@@ -14,6 +14,6 @@ Sistema corporativo desenvolvido com Streamlit, SQLite, SQLAlchemy e Pandas para
    venv\Scripts\Activate
 
 2. **rodar o servidor:**
-  '''bash
-    com o ambiente ja ativado
-  '' python streamlit run:app.py
+  ```bash
+  # com o ambiente ja ativado
+   python streamlit run:app.py
