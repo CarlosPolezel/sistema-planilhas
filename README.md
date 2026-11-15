@@ -1,19 +1,19 @@
-#Prototipo de Sistema Interno de Gestão de Planilhas
+# Sistema interno de gestão de planilhas
 
-Sistema corporativo desenvolvido com Streamlit, SQLite, SQLAlchemy e Pandas para desmaterialização de planilhas operacionais e controlo estrito de acessos.
+Protótipo em Python para registrar e consultar dados operacionais, com interface Streamlit, persistência em SQLite via SQLAlchemy e importação e exportação de planilhas.
 
-## Requisitos
-- Python 3.13 ou superior instalado.
+## Executar localmente
 
-## Instalação e Execução (Local / Servidor)
+Com Python 3.13 ou superior, execute na pasta do repositório:
 
-1. **Criar e ativar o ambiente virtual:**
-   ```bash
-   python -m venv venv
-   # No Windows (PowerShell):
-   venv\Scripts\Activate
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python init_db.py
+python -m streamlit run app.py
+```
 
-2. **rodar o servidor:**
-  ```bash
-  # com o ambiente ja ativado
-   python streamlit run:app.py
+No Linux ou macOS, ative o ambiente com `source .venv/bin/activate`. Na primeira execução, `init_db.py` cria as tabelas e pede uma senha para o usuário `admin`. Use esse usuário e a senha escolhida para entrar no aplicativo pelo endereço exibido no terminal.
+
+Por padrão, o banco é criado em `sistema.db` na pasta do projeto. Use dados fictícios em demonstrações.

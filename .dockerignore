@@ -1,7 +1,8 @@
-venv/
-.venv/
-__pycache__/
-*.db
-.env
 .git
-.gitignore
+.venv/
+venv/
+__pycache__/
+*.pyc
+.env
+sistema.db
+sistema.db-*
